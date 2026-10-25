@@ -25,3 +25,6 @@ scrollgauge = "scrollgauge.app:main"
 
 [tool.setuptools]
 packages = ["scrollgauge"]
+
+[tool.setuptools.data-files]
+"share/applications" = ["data/io.github.vikmanou.ScrollGauge.desktop"]

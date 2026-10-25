@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Scroll Gauge
+Comment=Set global and per-app touchpad scroll speed
+Exec=scrollgauge
+Icon=input-touchpad-symbolic
+Terminal=false
+Categories=GTK;Settings;HardwareSettings;
+Keywords=scroll;touchpad;speed;sensitivity;
+StartupNotify=true
