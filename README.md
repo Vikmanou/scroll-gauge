@@ -36,14 +36,14 @@ gdbus call --session --dest org.gnome.Shell.Extensions --object-path /org/gnome/
 Run `scrollgauge`.
 
 - **Global speed:** used by every app without its own speed.
-- **Per-app speeds:** pick an app, press Add, then drag its slider. Touchpad Speed Control switches to it whenever you use that app.
-- **Try it:** swipe on the demo text. Moving any slider applies that speed to the demo straight away, and the window shows how many lines your last swipe moved.
+- **Per-app speeds:** pick an app, press Add, then drag its slider. Touchpad Speed Control switches to it whenever you use that app, so test it in the app itself.
+- **Try it:** swipe on the demo text to feel the global speed. Changes apply straight away, and the window shows how many lines your last swipe moved.
 
 Changes save automatically.
 
 ## Limitations
 
-- The demo shows the speed in Scroll Gauge's own window. Apps scale scrolling differently, so the same speed can still feel a little different elsewhere.
+- The demo only shows the global speed. Apps scale scrolling differently, so the same speed can still feel a little different elsewhere.
 - Per-app speeds need Touchpad Speed Control.
 - Horizontal scrolling gets the same speed as vertical.
 
