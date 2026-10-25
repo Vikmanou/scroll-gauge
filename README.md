@@ -1,6 +1,6 @@
 # Scroll Gauge
 
-A small window for setting touchpad scroll speed on GNOME Wayland: one global speed, per-app speeds, and a demo page to feel the result while you drag the slider.
+A GNOME app for setting touchpad scroll speed on GNOME Wayland: one global speed, per-app speeds, and a demo page to feel the result while you drag the slider.
 
 WSF's own window only sets one global speed, and Touchpad Speed Control's settings only set per-app speeds, and neither lets you try the speed while you adjust it. Scroll Gauge puts both in one window with a live demo.
 
@@ -10,7 +10,7 @@ Linux, GNOME on Wayland, any distribution. Not GNOME on X11 or other desktops (W
 
 ## Requirements
 
-- Python 3.11+ with tkinter: `sudo dnf install python3-tkinter` (Fedora), `sudo apt install python3-tk` (Ubuntu/Debian), `sudo pacman -S tk` (Arch)
+- Python 3.11+ with PyGObject, GTK 4 and libadwaita 1.4+ (already installed on GNOME). If missing: `sudo dnf install python3-gobject libadwaita` (Fedora), `sudo apt install python3-gi gir1.2-adw-1` (Ubuntu/Debian), `sudo pacman -S python-gobject libadwaita` (Arch)
 - [WSF](https://github.com/daniel-g-carrasco/wayland-scroll-factor), enabled with `wsf enable`
 - [Touchpad Speed Control](https://extensions.gnome.org/extension/10008/touchpad-speed-control/) for per-app speeds (optional)
 

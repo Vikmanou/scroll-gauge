@@ -11,7 +11,7 @@ license = "MIT"
 requires-python = ">=3.11"
 classifiers = [
     "Operating System :: POSIX :: Linux",
-    "Environment :: X11 Applications",
+    "Environment :: X11 Applications :: GTK",
     "Topic :: Desktop Environment :: Gnome",
     "Programming Language :: Python :: 3",
 ]
