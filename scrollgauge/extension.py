@@ -1,5 +1,4 @@
 import ast
-import configparser
 import os
 import subprocess
 from pathlib import Path
@@ -61,28 +60,3 @@ def is_enabled() -> bool:
 def enable() -> None:
     subprocess.run(["gnome-extensions", "enable", UUID], check=True)
 
-
-def installed_apps() -> dict[str, str]:
-    apps: dict[str, str] = {}
-    for base in _data_dirs():
-        root = base / "applications"
-        for desktop_file in sorted(root.rglob("*.desktop")):
-            app_id = str(desktop_file.relative_to(root)).replace("/", "-").removesuffix(".desktop")
-            if app_id in apps:
-                continue
-            name = visible_app_name(desktop_file)
-            if name:
-                apps[app_id] = name
-    return apps
-
-
-def visible_app_name(desktop_file: Path) -> str | None:
-    parser = configparser.ConfigParser(interpolation=None, strict=False)
-    try:
-        parser.read(desktop_file, encoding="utf-8")
-        entry = parser["Desktop Entry"]
-    except (configparser.Error, UnicodeDecodeError, KeyError):
-        return None
-    if entry.get("type") != "Application" or "true" in (entry.get("nodisplay"), entry.get("hidden")):
-        return None
-    return entry.get("name")
