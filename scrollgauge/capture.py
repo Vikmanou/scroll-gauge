@@ -1,5 +1,3 @@
-"""Screenshots through the xdg-desktop-portal Screenshot interface."""
-
 import os
 import secrets
 import time
@@ -24,7 +22,6 @@ class Screenshotter:
         self._sender = self._bus.get_unique_name()[1:].replace(".", "_")
 
     def grab(self) -> np.ndarray:
-        """Take a full-screen screenshot and return it as an RGB array."""
         token = "scrollgauge_" + secrets.token_hex(4)
         handle = f"{PORTAL_PATH}/request/{self._sender}/{token}"
         loop = GLib.MainLoop()
@@ -51,7 +48,7 @@ class Screenshotter:
             loop.run()
         finally:
             self._bus.signal_unsubscribe(sub)
-            if "code" in result:  # on timeout the source already removed itself
+            if "code" in result:
                 GLib.source_remove(timeout)
 
         if "code" not in result:
@@ -64,11 +61,9 @@ class Screenshotter:
             with Image.open(path) as img:
                 return np.asarray(img.convert("RGB"))
         finally:
-            # The portal saves a file for every shot; don't litter the user's folders.
             os.unlink(path)
 
-    def grab_settled(self, interval_s: float = 0.15, max_wait_s: float = 3.0, tolerance: float = 0.5) -> np.ndarray:
-        """Keep shooting until two frames in a row match, so momentum has stopped."""
+    def grab_when_still(self, interval_s: float = 0.15, max_wait_s: float = 3.0, tolerance: float = 0.5) -> np.ndarray:
         prev = self.grab()
         deadline = time.monotonic() + max_wait_s
         while time.monotonic() < deadline:
