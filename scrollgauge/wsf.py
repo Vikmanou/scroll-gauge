@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PRELOAD_LIBRARY = "libwsf_preload.so"
+CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "wayland-scroll-factor/config"
 
 
 class WsfError(RuntimeError):
