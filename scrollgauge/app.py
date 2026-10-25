@@ -55,7 +55,7 @@ class SpeedControl(Gtk.Box):
         scale.add_mark(DEFAULT_SPEED, Gtk.PositionType.BOTTOM, None)
         spin = Gtk.SpinButton(
             adjustment=self.adjustment, digits=2, climb_rate=0.05, numeric=True, width_chars=4, valign=Gtk.Align.CENTER,
-            tooltip_text="Type an exact speed, or step it with − and +",
+            tooltip_text="Type an exact speed or step it with − and +",
         )
         button.add_css_class("flat")
         button.set_valign(Gtk.Align.CENTER)
@@ -246,9 +246,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         return button
 
     def _build_demo(self) -> Adw.PreferencesGroup:
-        group = Adw.PreferencesGroup(
-            title="Try It", description="Swipe on the text with two fingers to feel the global speed."
-        )
+        group = Adw.PreferencesGroup(title="Try It")
         buffer = Gtk.TextBuffer()
         buffer.set_text(demo_text())
         self.demo = Gtk.TextView(
