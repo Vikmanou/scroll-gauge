@@ -41,6 +41,10 @@ def save_app_factors(schemas: Path, factors: dict[str, float]) -> None:
         _gsettings(schemas, "set", SCHEMA_ID, key, value)
 
 
+def load_global_factor(schemas: Path) -> float:
+    return float(_gsettings(schemas, "get", SCHEMA_ID, "global-factor"))
+
+
 def save_global_factor(schemas: Path, factor: float) -> None:
     for key in ("global-factor", "h-global-factor"):
         _gsettings(schemas, "set", SCHEMA_ID, key, f"{factor:.2f}")
