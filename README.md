@@ -25,7 +25,7 @@ Tested on Fedora 44, GNOME 50.
 Fedora (COPR):
 
 ```bash
-sudo dnf copr enable vikmanou/scrollgauge
+sudo dnf copr enable viken/scrollgauge
 sudo dnf install scrollgauge
 ```
 
