@@ -100,7 +100,13 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
             view.set_content(Adw.StatusPage(icon_name="dialog-warning-symbolic", title="WSF Not Found", description=str(err)))
             return
         if self.schemas:
-            current = extension.load_global_factor(self.schemas)
+            if extension.is_customized("global-factor"):
+                current = extension.load_global_factor(self.schemas)
+            else:
+                extension.save_global_factor(self.schemas, current)
+            if not extension.is_customized("app-factors"):
+                self.factors = extension.starter_app_factors(set(self.apps), current)
+                extension.save_app_factors(self.schemas, self.factors)
 
         page = Adw.PreferencesPage()
         page.add(self._build_global(current))
