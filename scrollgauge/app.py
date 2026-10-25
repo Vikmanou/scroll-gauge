@@ -54,7 +54,8 @@ class SpeedControl(Gtk.Box):
         scale.set_size_request(200, -1)
         scale.add_mark(DEFAULT_SPEED, Gtk.PositionType.BOTTOM, None)
         spin = Gtk.SpinButton(
-            adjustment=self.adjustment, digits=2, climb_rate=0.05, numeric=True, width_chars=4, valign=Gtk.Align.CENTER
+            adjustment=self.adjustment, digits=2, climb_rate=0.05, numeric=True, width_chars=4, valign=Gtk.Align.CENTER,
+            tooltip_text="Type an exact speed, or step it with − and +",
         )
         button.add_css_class("flat")
         button.set_valign(Gtk.Align.CENTER)
@@ -115,9 +116,15 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         )
         row = Adw.ActionRow(title="Touchpad scroll", title_lines=1, activatable=False)
         row.add_prefix(Gtk.Image.new_from_icon_name("input-touchpad-symbolic"))
-        reset = Gtk.Button(icon_name="edit-undo-symbolic", tooltip_text=f"Reset to {DEFAULT_SPEED:.2f}")
+        reset = Gtk.Button(icon_name="edit-undo-symbolic", tooltip_text=f"Reset to the system default ({DEFAULT_SPEED:.2f})")
         self.global_control = SpeedControl(current, self._on_global, reset)
         reset.connect("clicked", lambda _: self.global_control.adjustment.set_value(DEFAULT_SPEED))
+
+        def update_reset(adjustment: Gtk.Adjustment) -> None:
+            reset.set_sensitive(round(adjustment.get_value(), 2) != DEFAULT_SPEED)
+
+        self.global_control.adjustment.connect("value-changed", update_reset)
+        update_reset(self.global_control.adjustment)
         self.controls.add_widget(self.global_control)
         row.add_suffix(self.global_control)
         group.add(row)
@@ -127,7 +134,10 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         group = Adw.PreferencesGroup(title="Per-App Speeds")
         if self.schemas is None:
             group.set_description("Needs the Touchpad Speed Control extension.")
-            row = Adw.ActionRow(title="Get Touchpad Speed Control", subtitle="extensions.gnome.org", activatable=True)
+            row = Adw.ActionRow(
+                title="Get Touchpad Speed Control", subtitle="extensions.gnome.org", activatable=True,
+                tooltip_text="Open the extension's page in your browser",
+            )
             row.add_suffix(Gtk.Image.new_from_icon_name("adw-external-link-symbolic"))
             row.connect("activated", lambda _: Gtk.UriLauncher.new(EXTENSION_URL).launch(self, None, None, None))
             group.add(row)
@@ -139,7 +149,9 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
 
         if not extension.is_enabled():
             off_row = Adw.ActionRow(title="Touchpad Speed Control is off", subtitle="Per-app speeds apply once it's on")
-            turn_on = Gtk.Button(label="Turn On", valign=Gtk.Align.CENTER)
+            turn_on = Gtk.Button(
+                label="Turn On", valign=Gtk.Align.CENTER, tooltip_text="Turn on Touchpad Speed Control so per-app speeds apply"
+            )
             turn_on.add_css_class("suggested-action")
             turn_on.connect("clicked", lambda _: (extension.enable(), group.remove(off_row)))
             off_row.add_suffix(turn_on)
@@ -171,6 +183,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
             popover=self.popover,
             valign=Gtk.Align.CENTER,
             child=Adw.ButtonContent(icon_name="list-add-symbolic", label="Add App"),
+            tooltip_text="Give an app its own speed",
         )
         button.add_css_class("flat")
         self._refresh_app_list()
@@ -202,7 +215,9 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         info = self.apps[app_id]
         row = Adw.ActionRow(title=info.get_display_name(), title_lines=1, activatable=False)
         row.add_prefix(app_icon(info, 32))
-        remove = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Remove")
+        remove = Gtk.Button(
+            icon_name="user-trash-symbolic", tooltip_text=f"Remove {info.get_display_name()}; it will use the global speed"
+        )
         control = SpeedControl(self.factors[app_id], lambda value: self._on_app_speed(app_id, value), remove)
         remove.connect("clicked", lambda _: self._remove_app(app_id))
         self.controls.add_widget(control)
