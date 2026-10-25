@@ -153,7 +153,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
             group.add(row)
             return group
 
-        group.set_description("Applied automatically whenever you use the app. Try them out in the app itself.")
+        group.set_description("Applied automatically. Try them out in the app itself.")
         group.set_header_suffix(self._build_add_button())
         self.per_app_group = group
 
