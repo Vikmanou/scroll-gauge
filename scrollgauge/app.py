@@ -1,260 +1,320 @@
-import tkinter as tk
-import webbrowser
-from collections import Counter
+import textwrap
 from collections.abc import Callable
-from tkinter import font, ttk
+from itertools import cycle, islice
 
-from . import extension, wsf
+import gi
 
-MIN_SPEED, MAX_SPEED = 0.05, 2.0
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gio, GLib, Gtk, Pango
+
+from . import __version__, extension, wsf
+
+APP_ID = "io.github.vikmanou.ScrollGauge"
+MIN_SPEED, MAX_SPEED, DEFAULT_SPEED = 0.05, 3.0, 1.0
 SAVE_DELAY_MS = 300
 SWIPE_GAP_MS = 350
 EXTENSION_URL = "https://extensions.gnome.org/extension/10008/touchpad-speed-control/"
-DEMO_TEXT = (
-    "Scrolling should feel calm and predictable.",
-    "One swipe should move about the same distance in every app.",
-    "Try a short swipe, then a long one.",
-    "Slow swipes and quick flicks both count.",
-    "Adjust the slider until this feels right.",
+DEMO_LINES = 400
+LOREM_IPSUM = (
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris tristique viverra lobortis. Proin sem velit, "
+    "hendrerit condimentum tortor sit amet, rutrum ornare ipsum. Pellentesque auctor et metus id condimentum. Morbi in "
+    "facilisis metus, ac placerat purus. Nunc faucibus pulvinar est, vitae dictum nibh condimentum nec. Nulla et "
+    "accumsan enim. Praesent ultrices malesuada velit, in sagittis odio suscipit a. Maecenas scelerisque quis tellus ut "
+    "vulputate. Proin vel nisl blandit, convallis est vel, faucibus libero. Fusce ut porta mauris, at aliquam justo. "
+    "Phasellus erat nulla, semper a hendrerit elementum, pharetra at ante. Proin laoreet lobortis ipsum ac euismod. "
+    "Phasellus sit amet aliquet enim. Vestibulum sit amet urna nec purus efficitur consectetur quis at turpis. Morbi "
+    "tristique turpis enim, et feugiat ex pellentesque id. Nulla eget varius neque. Pellentesque eu purus vel diam "
+    "lacinia ultricies et id massa. Aliquam luctus libero sit amet pretium vehicula. Donec quis pharetra neque, eget "
+    "laoreet erat. Mauris egestas ornare ante, in maximus velit lacinia laoreet. Suspendisse potenti. Quisque pretium "
+    "enim sed consectetur eleifend. Suspendisse in ligula a lacus finibus hendrerit. Morbi tempus non leo vitae "
+    "imperdiet. Sed dictum nibh ac mattis posuere."
 )
 
 
-def speed_text(value: float) -> str:
-    return f"{value:.2f}×"
+def demo_text() -> str:
+    lines = islice(cycle(textwrap.wrap(LOREM_IPSUM, width=44)), DEMO_LINES)
+    return "\n".join(f"{n:>3}   {line}" for n, line in enumerate(lines, start=1))
 
 
-class ScrollGauge(ttk.Frame):
-    def __init__(self, root: tk.Tk):
-        super().__init__(root, padding=16)
-        self.apps = extension.installed_apps()
+def app_icon(info: Gio.AppInfo, size: int) -> Gtk.Image:
+    icon = info.get_icon()
+    if icon is None:
+        return Gtk.Image(icon_name="application-x-executable", pixel_size=size)
+    return Gtk.Image(gicon=icon, pixel_size=size)
+
+
+class SpeedControl(Gtk.Box):
+    def __init__(self, value: float, on_change: Callable[[float], None], button: Gtk.Button):
+        super().__init__(spacing=8, valign=Gtk.Align.CENTER)
+        self.adjustment = Gtk.Adjustment(
+            value=value, lower=MIN_SPEED, upper=MAX_SPEED, step_increment=0.05, page_increment=0.25
+        )
+        scale = Gtk.Scale(adjustment=self.adjustment, draw_value=False, valign=Gtk.Align.CENTER)
+        scale.set_size_request(200, -1)
+        scale.add_mark(DEFAULT_SPEED, Gtk.PositionType.BOTTOM, None)
+        spin = Gtk.SpinButton(
+            adjustment=self.adjustment, digits=2, climb_rate=0.05, numeric=True, width_chars=4, valign=Gtk.Align.CENTER
+        )
+        button.add_css_class("flat")
+        button.set_valign(Gtk.Align.CENTER)
+        for child in (scale, spin, button):
+            self.append(child)
+        self.adjustment.connect("value-changed", lambda adj: on_change(round(adj.get_value(), 2)))
+
+    @property
+    def value(self) -> float:
+        return round(self.adjustment.get_value(), 2)
+
+
+class ScrollGaugeWindow(Adw.ApplicationWindow):
+    def __init__(self, app: Adw.Application):
+        super().__init__(application=app, title="Scroll Gauge", default_width=640, default_height=780)
+        self.set_size_request(520, -1)
         self.schemas = extension.schema_dir()
         self.factors = extension.load_app_factors(self.schemas) if self.schemas else {}
-        self.selected: str | None = None
-        self._pending: dict[str, tuple[str, Callable[[], None]]] = {}
-        self._swipe_timer: str | None = None
-        self._swipe_start = 1
-        self._settled_top = 1
+        self.apps = {
+            info.get_id().removesuffix(".desktop"): info
+            for info in Gio.AppInfo.get_all()
+            if info.should_show() and info.get_id()
+        }
+        self.app_rows: dict[str, Adw.ActionRow] = {}
+        self.controls = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+        self._pending: dict[str, tuple[int, Callable[[], None]]] = {}
+        self._swipe_timeout = 0
+        self._swipe_start = 0
+        self._settled_line = 0
+        self._last_swipe = "No swipe yet."
+        self._preview_text = ""
+
+        header = Adw.HeaderBar()
+        header.set_title_widget(Adw.WindowTitle(title="Scroll Gauge", subtitle=f"v{__version__}"))
+        view = Adw.ToolbarView()
+        view.add_top_bar(header)
+        self.set_content(view)
 
         try:
             current = wsf.read().vertical
-            self.wsf_error = None
         except wsf.WsfError as err:
-            current, self.wsf_error = 1.0, str(err)
+            view.set_content(Adw.StatusPage(icon_name="dialog-warning-symbolic", title="WSF Not Found", description=str(err)))
+            return
         if self.schemas:
             current = extension.load_global_factor(self.schemas)
 
-        self.global_speed = tk.DoubleVar(value=current)
-        self.app_speed = tk.DoubleVar(value=current)
+        page = Adw.PreferencesPage()
+        page.add(self._build_global(current))
+        page.add(self._build_per_app())
+        page.add(self._build_demo())
+        view.set_content(page)
+        self._preview(current, "Global speed")
+        self.connect("close-request", self._on_close)
 
-        self.columnconfigure(0, weight=1, uniform="col")
-        self.columnconfigure(1, weight=1, uniform="col")
-        self.rowconfigure(1, weight=1)
-        self._build_global().grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
-        self._build_per_app().grid(row=1, column=0, sticky="nsew", padx=(0, 16))
-        self._build_demo().grid(row=1, column=1, sticky="nsew")
-        self._preview(current, "Global")
+    def _build_global(self, current: float) -> Adw.PreferencesGroup:
+        group = Adw.PreferencesGroup(
+            title="Global Speed", description="Used by every app without its own speed. 1.00 is the system default."
+        )
+        row = Adw.ActionRow(title="Touchpad scroll", title_lines=1, activatable=False)
+        row.add_prefix(Gtk.Image.new_from_icon_name("input-touchpad-symbolic"))
+        reset = Gtk.Button(icon_name="edit-undo-symbolic", tooltip_text=f"Reset to {DEFAULT_SPEED:.2f}")
+        self.global_control = SpeedControl(current, self._on_global, reset)
+        reset.connect("clicked", lambda _: self.global_control.adjustment.set_value(DEFAULT_SPEED))
+        self.controls.add_widget(self.global_control)
+        row.add_suffix(self.global_control)
+        group.add(row)
+        return group
 
-    def _build_global(self) -> ttk.Frame:
-        frame = ttk.Frame(self)
-        frame.columnconfigure(1, weight=1)
-        ttk.Label(frame, text="Global speed", style="Heading.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 12))
-        scale = ttk.Scale(frame, from_=MIN_SPEED, to=MAX_SPEED, variable=self.global_speed, command=self._on_global)
-        scale.grid(row=0, column=1, sticky="ew")
-        self.global_label = ttk.Label(frame, text=speed_text(self.global_speed.get()), width=6, anchor="e")
-        self.global_label.grid(row=0, column=2, padx=(12, 0))
-        hint = self.wsf_error or "Used by every app that has no speed of its own."
-        ttk.Label(frame, text=hint, style="Hint.TLabel").grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 0))
-        if self.wsf_error:
-            scale.state(["disabled"])
-        return frame
-
-    def _build_per_app(self) -> ttk.Frame:
-        frame = ttk.Frame(self)
-        frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(1, weight=1)
-        ttk.Label(frame, text="Per-app speeds", style="Heading.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 8))
-
+    def _build_per_app(self) -> Adw.PreferencesGroup:
+        group = Adw.PreferencesGroup(title="Per-App Speeds")
         if self.schemas is None:
-            ttk.Label(frame, text="Needs the Touchpad Speed Control extension.", style="Hint.TLabel").grid(row=1, column=0, sticky="nw")
-            link = ttk.Label(frame, text="Get it from extensions.gnome.org", style="Link.TLabel", cursor="hand2")
-            link.grid(row=2, column=0, sticky="nw")
-            link.bind("<Button-1>", lambda _: webbrowser.open(EXTENSION_URL))
-            return frame
+            group.set_description("Needs the Touchpad Speed Control extension.")
+            row = Adw.ActionRow(title="Get Touchpad Speed Control", subtitle="extensions.gnome.org", activatable=True)
+            row.add_suffix(Gtk.Image.new_from_icon_name("adw-external-link-symbolic"))
+            row.connect("activated", lambda _: Gtk.UriLauncher.new(EXTENSION_URL).launch(self, None, None, None))
+            group.add(row)
+            return group
 
-        self.tree = ttk.Treeview(frame, columns=("speed",), selectmode="browse", height=8)
-        self.tree.heading("#0", text="App", anchor="w")
-        self.tree.heading("speed", text="Speed", anchor="e")
-        self.tree.column("speed", width=70, stretch=False, anchor="e")
-        self.tree.grid(row=1, column=0, sticky="nsew")
-        self.tree.bind("<<TreeviewSelect>>", self._on_select)
-        for app_id in sorted((a for a in self.factors if a in self.apps), key=self.apps.get):
-            self.tree.insert("", "end", iid=app_id, text=self.apps[app_id], values=(speed_text(self.factors[app_id]),))
-
-        editor = ttk.Frame(frame)
-        editor.grid(row=2, column=0, sticky="ew", pady=(8, 0))
-        editor.columnconfigure(0, weight=1)
-        self.app_scale = ttk.Scale(editor, from_=MIN_SPEED, to=MAX_SPEED, variable=self.app_speed, command=self._on_app_speed)
-        self.app_scale.grid(row=0, column=0, sticky="ew")
-        self.app_label = ttk.Label(editor, text="", width=6, anchor="e")
-        self.app_label.grid(row=0, column=1, padx=(12, 8))
-        self.remove_button = ttk.Button(editor, text="Remove", command=self._remove)
-        self.remove_button.grid(row=0, column=2)
-
-        adder = ttk.Frame(frame)
-        adder.grid(row=3, column=0, sticky="ew", pady=(8, 0))
-        adder.columnconfigure(0, weight=1)
-        self.app_choice = ttk.Combobox(adder, state="readonly")
-        self.app_choice.grid(row=0, column=0, sticky="ew")
-        ttk.Button(adder, text="Add", command=self._add).grid(row=0, column=1, padx=(8, 0))
-        self._refresh_choices()
-        self._set_editor_enabled(False)
+        group.set_description("Applied automatically whenever you use the app.")
+        group.set_header_suffix(self._build_add_button())
+        self.per_app_group = group
 
         if not extension.is_enabled():
-            notice = ttk.Frame(frame)
-            notice.grid(row=4, column=0, sticky="ew", pady=(8, 0))
-            ttk.Label(notice, text="Touchpad Speed Control is turned off.", style="Hint.TLabel").pack(side="left")
-            ttk.Button(notice, text="Turn on", command=lambda: (extension.enable(), notice.destroy())).pack(side="right")
-        return frame
+            off_row = Adw.ActionRow(title="Touchpad Speed Control is off", subtitle="Per-app speeds apply once it's on")
+            turn_on = Gtk.Button(label="Turn On", valign=Gtk.Align.CENTER)
+            turn_on.add_css_class("suggested-action")
+            turn_on.connect("clicked", lambda _: (extension.enable(), group.remove(off_row)))
+            off_row.add_suffix(turn_on)
+            group.add(off_row)
 
-    def _build_demo(self) -> ttk.Frame:
-        frame = ttk.Frame(self)
-        frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(1, weight=1)
-        ttk.Label(frame, text="Try it", style="Heading.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 8))
+        self.empty_row = Adw.ActionRow(title="No apps yet", subtitle="Use Add App to give an app its own speed")
+        group.add(self.empty_row)
+        for app_id in sorted((a for a in self.factors if a in self.apps), key=lambda a: self.apps[a].get_display_name()):
+            self._add_app_row(app_id)
+        self._update_empty_row()
+        return group
 
-        self.demo = tk.Text(frame, wrap="word", relief="flat", padx=12, pady=8, spacing1=4, spacing3=4, cursor="arrow")
-        scrollbar = ttk.Scrollbar(frame, command=self.demo.yview)
-        self.demo.configure(yscrollcommand=lambda first, last: (scrollbar.set(first, last), self._on_demo_scroll()))
-        self.demo.grid(row=1, column=0, sticky="nsew")
-        scrollbar.grid(row=1, column=1, sticky="ns")
-        for n in range(1, 401):
-            self.demo.insert("end", f"{n:>3}   {DEMO_TEXT[n % len(DEMO_TEXT)]}\n")
-        self.demo.configure(state="disabled")
+    def _build_add_button(self) -> Gtk.MenuButton:
+        self.search = Gtk.SearchEntry(placeholder_text="Search apps")
+        self.app_list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        self.app_list.add_css_class("navigation-sidebar")
+        self.app_list.set_filter_func(self._matches_search)
+        self.app_list.connect("row-activated", self._on_pick_app)
+        self.search.connect("search-changed", lambda _: self.app_list.invalidate_filter())
+        scroller = Gtk.ScrolledWindow(child=self.app_list, hscrollbar_policy=Gtk.PolicyType.NEVER)
+        scroller.set_size_request(300, 340)
 
-        self.swipe_label = ttk.Label(frame, text="Swipe on the text with two fingers.", style="Hint.TLabel")
-        self.swipe_label.grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
-        self.preview_label = ttk.Label(frame, text="", style="Hint.TLabel")
-        self.preview_label.grid(row=3, column=0, columnspan=2, sticky="w")
-        return frame
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.append(self.search)
+        box.append(scroller)
+        self.popover = Gtk.Popover(child=box)
+        self.popover.connect("show", lambda _: self.search.grab_focus())
+        button = Gtk.MenuButton(
+            popover=self.popover,
+            valign=Gtk.Align.CENTER,
+            child=Adw.ButtonContent(icon_name="list-add-symbolic", label="Add App"),
+        )
+        button.add_css_class("flat")
+        self._refresh_app_list()
+        return button
 
-    def _on_global(self, _=None) -> None:
-        value = round(self.global_speed.get(), 2)
-        self.global_label.configure(text=speed_text(value))
-        self._preview(value, "Global")
+    def _build_demo(self) -> Adw.PreferencesGroup:
+        group = Adw.PreferencesGroup(
+            title="Try It", description="Swipe on the text with two fingers. Moving a slider applies its speed here."
+        )
+        buffer = Gtk.TextBuffer()
+        buffer.set_text(demo_text())
+        self.demo = Gtk.TextView(
+            buffer=buffer, editable=False, cursor_visible=False, monospace=True,
+            top_margin=12, bottom_margin=12, left_margin=16, right_margin=16, pixels_below_lines=8,
+        )
+        self.demo_scroller = Gtk.ScrolledWindow(child=self.demo, height_request=280)
+        self.demo_scroller.get_vadjustment().connect("value-changed", self._on_demo_scroll)
+        card = Gtk.Frame(child=self.demo_scroller)
+        card.add_css_class("card")
+        card.set_overflow(Gtk.Overflow.HIDDEN)
+
+        self.demo_status = Gtk.Label(xalign=0, margin_top=12, wrap=True)
+        self.demo_status.add_css_class("dim-label")
+        group.add(card)
+        group.add(self.demo_status)
+        return group
+
+    def _add_app_row(self, app_id: str) -> None:
+        info = self.apps[app_id]
+        row = Adw.ActionRow(title=info.get_display_name(), title_lines=1, activatable=False)
+        row.add_prefix(app_icon(info, 32))
+        remove = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Remove")
+        control = SpeedControl(self.factors[app_id], lambda value: self._on_app_speed(app_id, value), remove)
+        remove.connect("clicked", lambda _: self._remove_app(app_id))
+        self.controls.add_widget(control)
+        row.add_suffix(control)
+        self.per_app_group.add(row)
+        self.app_rows[app_id] = row
+
+    def _refresh_app_list(self) -> None:
+        self.app_list.remove_all()
+        available = sorted(
+            (info.get_display_name(), app_id) for app_id, info in self.apps.items() if app_id not in self.factors
+        )
+        for name, app_id in available:
+            box = Gtk.Box(spacing=12, margin_top=4, margin_bottom=4)
+            box.append(app_icon(self.apps[app_id], 24))
+            box.append(Gtk.Label(label=name, xalign=0, ellipsize=Pango.EllipsizeMode.END))
+            self.app_list.append(Gtk.ListBoxRow(child=box, name=app_id, tooltip_text=app_id))
+
+    def _matches_search(self, row: Gtk.ListBoxRow) -> bool:
+        query = self.search.get_text().strip().lower()
+        app_id = row.get_name()
+        return not query or query in self.apps[app_id].get_display_name().lower() or query in app_id.lower()
+
+    def _update_empty_row(self) -> None:
+        self.empty_row.set_visible(not self.app_rows)
+
+    def _on_global(self, value: float) -> None:
+        self._preview(value, "Global speed")
         if self.schemas:
             self._later("global", lambda: extension.save_global_factor(self.schemas, value))
 
-    def _on_select(self, _=None) -> None:
-        selection = self.tree.selection()
-        self.selected = selection[0] if selection else None
-        self._set_editor_enabled(self.selected is not None)
-        if self.selected:
-            value = self.factors[self.selected]
-            self.app_speed.set(value)
-            self.app_label.configure(text=speed_text(value))
-            self._preview(value, self.apps[self.selected])
-
-    def _on_app_speed(self, _=None) -> None:
-        if not self.selected:
-            return
-        value = round(self.app_speed.get(), 2)
-        self.factors[self.selected] = value
-        self.tree.set(self.selected, "speed", speed_text(value))
-        self.app_label.configure(text=speed_text(value))
-        self._preview(value, self.apps[self.selected])
+    def _on_app_speed(self, app_id: str, value: float) -> None:
+        self.factors[app_id] = value
+        self._preview(value, self.apps[app_id].get_display_name())
         self._save_factors()
 
-    def _add(self) -> None:
-        app_id = self._choices.get(self.app_choice.get())
-        if not app_id:
-            return
-        self.factors[app_id] = round(self.global_speed.get(), 2)
-        self.tree.insert("", "end", iid=app_id, text=self.apps[app_id], values=(speed_text(self.factors[app_id]),))
-        self.tree.selection_set(app_id)
-        self.tree.see(app_id)
-        self._refresh_choices()
+    def _on_pick_app(self, _list: Gtk.ListBox, row: Gtk.ListBoxRow) -> None:
+        app_id = row.get_name()
+        self.popover.popdown()
+        self.search.set_text("")
+        self.factors[app_id] = self.global_control.value
+        self._add_app_row(app_id)
+        self._refresh_app_list()
+        self._update_empty_row()
         self._save_factors()
 
-    def _remove(self) -> None:
-        if not self.selected:
-            return
-        del self.factors[self.selected]
-        self.tree.delete(self.selected)
-        self._refresh_choices()
+    def _remove_app(self, app_id: str) -> None:
+        del self.factors[app_id]
+        self.per_app_group.remove(self.app_rows.pop(app_id))
+        self._refresh_app_list()
+        self._update_empty_row()
         self._save_factors()
-        self._on_global()
-
-    def _refresh_choices(self) -> None:
-        names = sorted((name, app_id) for app_id, name in self.apps.items() if app_id not in self.factors)
-        counts = Counter(name for name, _ in names)
-        self._choices = {name if counts[name] == 1 else f"{name} ({app_id})": app_id for name, app_id in names}
-        self.app_choice.configure(values=list(self._choices))
-        self.app_choice.set("Choose an app…")
-
-    def _set_editor_enabled(self, enabled: bool) -> None:
-        state = ["!disabled"] if enabled else ["disabled"]
-        self.app_scale.state(state)
-        self.remove_button.state(state)
-        if not enabled:
-            self.app_label.configure(text="")
+        self._preview(self.global_control.value, "Global speed")
 
     def _save_factors(self) -> None:
         factors = dict(self.factors)
         self._later("factors", lambda: extension.save_app_factors(self.schemas, factors))
 
     def _preview(self, value: float, source: str) -> None:
-        self.preview_label.configure(text=f"Demo is using: {source}, {speed_text(value)}")
-        if not self.wsf_error:
-            self._later("wsf", lambda: wsf.write(wsf.Factors(value, value)))
+        self._preview_text = f"Demo speed: {source}, {value:.2f}"
+        self._update_demo_status()
+        self._later("wsf", lambda: wsf.write(wsf.Factors(value, value)))
 
-    def _on_demo_scroll(self) -> None:
-        if self._swipe_timer is None:
-            self._swipe_start = self._settled_top
+    def _on_demo_scroll(self, _adjustment: Gtk.Adjustment) -> None:
+        if self._swipe_timeout:
+            GLib.source_remove(self._swipe_timeout)
         else:
-            self.after_cancel(self._swipe_timer)
-        self._swipe_timer = self.after(SWIPE_GAP_MS, self._end_swipe)
+            self._swipe_start = self._settled_line
+        self._swipe_timeout = GLib.timeout_add(SWIPE_GAP_MS, self._end_swipe)
 
-    def _end_swipe(self) -> None:
-        self._swipe_timer = None
-        top = int(self.demo.index("@0,0").split(".")[0])
-        moved = abs(top - self._swipe_start)
-        self._settled_top = top
+    def _end_swipe(self) -> bool:
+        self._swipe_timeout = 0
+        top = int(self.demo_scroller.get_vadjustment().get_value())
+        line = self.demo.get_line_at_y(top)[0].get_line()
+        moved = abs(line - self._swipe_start)
+        self._settled_line = line
         if moved:
-            self.swipe_label.configure(text=f"Last swipe moved {moved} line{'s' if moved != 1 else ''}.")
+            self._last_swipe = f"Last swipe moved {moved} line{'s' if moved != 1 else ''}."
+            self._update_demo_status()
+        return GLib.SOURCE_REMOVE
+
+    def _update_demo_status(self) -> None:
+        self.demo_status.set_label(f"{self._last_swipe}  ·  {self._preview_text}")
 
     def _later(self, key: str, action: Callable[[], None]) -> None:
         if key in self._pending:
-            self.after_cancel(self._pending[key][0])
-        after_id = self.after(SAVE_DELAY_MS, lambda: self._pending.pop(key)[1]())
-        self._pending[key] = (after_id, action)
+            GLib.source_remove(self._pending[key][0])
 
-    def close(self) -> None:
-        for after_id, action in self._pending.values():
-            self.after_cancel(after_id)
+        def run() -> bool:
+            self._pending.pop(key)[1]()
+            return GLib.SOURCE_REMOVE
+
+        self._pending[key] = (GLib.timeout_add(SAVE_DELAY_MS, run), action)
+
+    def _on_close(self, _window) -> bool:
+        for source, action in self._pending.values():
+            GLib.source_remove(source)
             action()
-        if not self.wsf_error:
-            value = round(self.global_speed.get(), 2)
-            wsf.write(wsf.Factors(value, value))
-        self.master.destroy()
+        self._pending.clear()
+        value = self.global_control.value
+        wsf.write(wsf.Factors(value, value))
+        return False
 
 
-def _style(root: tk.Tk) -> None:
-    style = ttk.Style(root)
-    style.theme_use("clam")
-    family = font.nametofont("TkDefaultFont").actual("family")
-    style.configure("Heading.TLabel", font=(family, 12, "bold"))
-    style.configure("Hint.TLabel", foreground="#666666")
-    style.configure("Link.TLabel", foreground="#1c71d8")
-    style.configure("Treeview", rowheight=26)
+class ScrollGaugeApp(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID)
+
+    def do_activate(self) -> None:
+        window = self.props.active_window or ScrollGaugeWindow(self)
+        window.present()
 
 
-def main() -> None:
-    root = tk.Tk(className="scrollgauge")
-    root.title("Scroll Gauge")
-    root.geometry("860x540")
-    root.minsize(720, 440)
-    _style(root)
-    app = ScrollGauge(root)
-    app.pack(fill="both", expand=True)
-    root.protocol("WM_DELETE_WINDOW", app.close)
-    root.mainloop()
+def main() -> int:
+    return ScrollGaugeApp().run(None)
