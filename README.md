@@ -12,7 +12,7 @@ Linux, GNOME on Wayland, any distribution. Not GNOME on X11 or other desktops (W
 
 - Python 3.11+ with PyGObject, GTK 4 and libadwaita 1.4+ (already installed on GNOME). If missing: `sudo dnf install python3-gobject libadwaita` (Fedora), `sudo apt install python3-gi gir1.2-adw-1` (Ubuntu/Debian), `sudo pacman -S python-gobject libadwaita` (Arch)
 - [WSF](https://github.com/daniel-g-carrasco/wayland-scroll-factor), enabled with `wsf enable`
-- [Touchpad Speed Control](https://extensions.gnome.org/extension/10008/touchpad-speed-control/) for per-app speeds (optional)
+- Optional: the [Touchpad Speed Control](https://extensions.gnome.org/extension/10008/touchpad-speed-control/) GNOME extension, for per-app speeds. It switches to each app's speed as you use it. Without it, only the global speed is available. Install it from extensions.gnome.org or the Extension Manager app.
 
 ## Install
 
