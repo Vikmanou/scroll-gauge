@@ -19,8 +19,8 @@ Linux, GNOME on Wayland, any distribution. Not GNOME on X11 or other desktops (W
 ## Install
 
 ```bash
-git clone https://github.com/Vikmanou/Scroll-Gauge.git
-cd Scroll-Gauge
+git clone https://github.com/Vikmanou/scroll-gauge.git
+cd scroll-gauge
 pip install .
 ```
 

@@ -17,6 +17,10 @@ classifiers = [
 ]
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/Vikmanou/scroll-gauge"
+Issues = "https://github.com/Vikmanou/scroll-gauge/issues"
+
 [project.optional-dependencies]
 test = ["pytest"]
 
