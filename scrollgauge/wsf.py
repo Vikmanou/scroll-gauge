@@ -32,6 +32,3 @@ def read() -> Factors:
 def write(factors: Factors) -> None:
     _run("set", "--scroll-vertical", f"{factors.vertical:.4f}", "--scroll-horizontal", f"{factors.horizontal:.4f}")
 
-
-def is_loaded() -> bool:
-    return json.loads(_run("status", "--json")).get("gnome_shell_library_mapped", False)

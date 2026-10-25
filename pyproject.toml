@@ -5,23 +5,23 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "scrollgauge"
 version = "0.1.0"
-description = "Auto-calibrate per-app touchpad scroll speed on GNOME Wayland"
+description = "Set global and per-app touchpad scroll speed on GNOME Wayland"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 classifiers = [
     "Operating System :: POSIX :: Linux",
-    "Environment :: Console",
+    "Environment :: X11 Applications",
     "Topic :: Desktop Environment :: Gnome",
     "Programming Language :: Python :: 3",
 ]
-dependencies = ["numpy", "Pillow", "jeepney"]
+dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest"]
 
-[project.scripts]
-scrollgauge = "scrollgauge.cli:main"
+[project.gui-scripts]
+scrollgauge = "scrollgauge.app:main"
 
 [tool.setuptools]
 packages = ["scrollgauge"]
