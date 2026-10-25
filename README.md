@@ -44,7 +44,7 @@ Changes save automatically.
 ## Limitations
 
 - The demo only shows the global speed. Apps scale scrolling differently, so the same speed can still feel a little different elsewhere.
-- Per-app speeds need Touchpad Speed Control, and a changed speed applies the next time you switch to that app.
+- Per-app speeds need Touchpad Speed Control.
 - Touchpad only. Mouse wheel scrolling isn't affected, because WSF doesn't change it.
 - Horizontal scrolling gets the same speed as vertical.
 
