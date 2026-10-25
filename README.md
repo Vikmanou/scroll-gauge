@@ -11,9 +11,22 @@ Scroll Gauge works them out for you. It sends an identical swipe from a virtual 
 3. Phase correlation over the changed region finds the scroll distance to sub-pixel accuracy. Each app is sampled three times and the median is used.
 4. Every app's factor is scaled so its distance matches the reference app's, then saved to Touchpad Speed Control (or exported as a JSON file you can import).
 
+## Where it runs
+
+Scroll Gauge runs on **Linux with GNOME on Wayland**, on any distribution.
+
+| Environment | Supported |
+| --- | --- |
+| GNOME on Wayland (Fedora, Ubuntu, Debian, Arch, openSUSE, …) | Yes |
+| GNOME on X11 | No: GNOME Shell doesn't handle touchpad input there, so WSF can't hook it |
+| KDE Plasma, Sway, Hyprland and other desktops | No: WSF only supports GNOME |
+| macOS, Windows | No |
+
+Tested on Fedora 44 with GNOME 50.
+
 ## Requirements
 
-- GNOME on Wayland (tested on Fedora 44, GNOME 50)
+- Python 3.11 or newer
 - [WSF](https://github.com/daniel-g-carrasco/wayland-scroll-factor), enabled with `wsf enable`
 - [Touchpad Speed Control](https://extensions.gnome.org/extension/10008/touchpad-speed-control/) to apply factors automatically (optional, since `--json` works without it)
 
@@ -26,10 +39,15 @@ pip install -r requirements.txt
 pip install .
 ```
 
-`evdev` and `PyGObject` build from source, so you need the usual build packages first. On Fedora:
+`evdev` and `PyGObject` build from source, so install the usual build packages first:
 
 ```bash
+# Fedora
 sudo dnf install gcc python3-devel kernel-headers gobject-introspection-devel cairo-gobject-devel
+# Ubuntu / Debian
+sudo apt install build-essential python3-dev pkg-config libgirepository-2.0-dev libcairo2-dev
+# Arch
+sudo pacman -S base-devel linux-api-headers gobject-introspection cairo
 ```
 
 ### Allow access to /dev/uinput
