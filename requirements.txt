@@ -1,0 +1,4 @@
+numpy
+evdev
+Pillow
+PyGObject
