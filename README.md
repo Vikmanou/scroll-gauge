@@ -33,7 +33,7 @@ gdbus call --session --dest org.gnome.Shell.Extensions --object-path /org/gnome/
 
 ## Usage
 
-Run `scrollgauge`.
+Open Scroll Gauge from the app grid, or run `scrollgauge`.
 
 - **Global speed:** used by every app without its own speed.
 - **Per-app speeds:** starts with Files and Terminal. Pick an app, press Add, then drag its slider. Touchpad Speed Control switches to it whenever you use that app, so test it in the app itself.
@@ -44,7 +44,8 @@ Changes save automatically.
 ## Limitations
 
 - The demo only shows the global speed. Apps scale scrolling differently, so the same speed can still feel a little different elsewhere.
-- Per-app speeds need Touchpad Speed Control.
+- Per-app speeds need Touchpad Speed Control, and a changed speed applies the next time you switch to that app.
+- Touchpad only. Mouse wheel scrolling isn't affected, because WSF doesn't change it.
 - Horizontal scrolling gets the same speed as vertical.
 
 ## Development
