@@ -53,6 +53,20 @@ def save_app_factors(schemas: Path, factors: dict[str, float]) -> None:
         _gsettings(schemas, "set", SCHEMA_ID, key, value)
 
 
+def merge_factors(factors: dict[str, float], changes: dict[str, float | None]) -> dict[str, float]:
+    merged = dict(factors)
+    for app_id, factor in changes.items():
+        if factor is None:
+            merged.pop(app_id, None)
+        else:
+            merged[app_id] = factor
+    return merged
+
+
+def update_app_factors(schemas: Path, changes: dict[str, float | None]) -> None:
+    save_app_factors(schemas, merge_factors(load_app_factors(schemas), changes))
+
+
 def load_global_factor(schemas: Path) -> float:
     return float(_gsettings(schemas, "get", SCHEMA_ID, "global-factor"))
 
@@ -73,3 +87,8 @@ def is_enabled() -> bool:
 def enable() -> None:
     subprocess.run(["gnome-extensions", "enable", UUID], check=True)
 
+
+def reapply() -> None:
+    """Turn the extension off and on so it drops its cached speeds and applies the saved ones."""
+    for action in ("disable", "enable"):
+        subprocess.run(["gnome-extensions", action, UUID], check=True)
