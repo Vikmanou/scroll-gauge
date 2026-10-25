@@ -4,6 +4,8 @@ A GNOME app for setting touchpad scroll speed on GNOME Wayland: one global speed
 
 WSF's own window only sets one global speed, and Touchpad Speed Control's settings only set per-app speeds, and neither lets you try the speed while you adjust it. Scroll Gauge puts both in one window with a live demo.
 
+![Scroll Gauge](docs/screenshot.png)
+
 ## Where it runs
 
 Linux, GNOME on Wayland, any distribution. Not GNOME on X11 or other desktops (WSF is GNOME Wayland only). Tested on Fedora 44, GNOME 50.
@@ -12,7 +14,7 @@ Linux, GNOME on Wayland, any distribution. Not GNOME on X11 or other desktops (W
 
 - Python 3.11+ with PyGObject, GTK 4 and libadwaita 1.4+ (already installed on GNOME). If missing: `sudo dnf install python3-gobject libadwaita` (Fedora), `sudo apt install python3-gi gir1.2-adw-1` (Ubuntu/Debian), `sudo pacman -S python-gobject libadwaita` (Arch)
 - [WSF](https://github.com/daniel-g-carrasco/wayland-scroll-factor), enabled with `wsf enable`
-- Optional: the [Touchpad Speed Control](https://extensions.gnome.org/extension/10008/touchpad-speed-control/) GNOME extension, for per-app speeds. It switches to each app's speed as you use it. Without it, only the global speed is available. Install it from extensions.gnome.org or the Extension Manager app.
+- Optional: the [Touchpad Speed Control](https://extensions.gnome.org/extension/10008/touchpad-speed-control/) GNOME extension, for per-app speeds. It switches to each app's speed as you use it. Without it, only the global speed is available. See [Install](#install).
 
 ## Install
 
@@ -20,6 +22,13 @@ Linux, GNOME on Wayland, any distribution. Not GNOME on X11 or other desktops (W
 git clone https://github.com/Vikmanou/Scroll-Gauge.git
 cd Scroll-Gauge
 pip install .
+```
+
+Optional, for per-app speeds: install Touchpad Speed Control (GNOME asks you to confirm):
+
+```bash
+gdbus call --session --dest org.gnome.Shell.Extensions --object-path /org/gnome/Shell/Extensions \
+  --method org.gnome.Shell.Extensions.InstallRemoteExtension touchpad-speed-control@ritesh
 ```
 
 ## Usage
