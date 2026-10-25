@@ -1,45 +1,55 @@
+import ast
+import configparser
 import json
+import os
 import subprocess
 from pathlib import Path
 
-from gi.repository import Gio, GLib
-
 UUID = "touchpad-speed-control@ritesh"
 SCHEMA_ID = "org.gnome.shell.extensions.touchpad-speed-control"
-INSTALL_DIRS = [
-    Path.home() / ".local/share/gnome-shell/extensions",
-    Path("/usr/share/gnome-shell/extensions"),
-]
+FACTOR_KEYS = ("app-factors", "h-app-factors")
 
 
-def load_settings() -> Gio.Settings | None:
-    for base in INSTALL_DIRS:
-        schema_dir = base / UUID / "schemas"
-        if not (schema_dir / "gschemas.compiled").exists():
-            continue
-        source = Gio.SettingsSchemaSource.new_from_directory(
-            str(schema_dir), Gio.SettingsSchemaSource.get_default(), False
-        )
-        schema = source.lookup(SCHEMA_ID, False)
-        if schema is not None:
-            return Gio.Settings.new_full(schema, None, None)
+def _data_dirs() -> list[Path]:
+    home = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local/share")
+    system = os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"
+    return [Path(d) for d in [home, *system.split(":")] if d]
+
+
+def schema_dir() -> Path | None:
+    for base in _data_dirs():
+        candidate = base / "gnome-shell/extensions" / UUID / "schemas"
+        if (candidate / "gschemas.compiled").exists():
+            return candidate
     return None
 
 
+def _gsettings(schemas: Path, *args: str) -> str:
+    cmd = ["gsettings", "--schemadir", str(schemas), *args]
+    return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def read_app_factors(schemas: Path, key: str = "app-factors") -> dict[str, float]:
+    text = _gsettings(schemas, "get", SCHEMA_ID, key).removeprefix("@a{sd} ")
+    return ast.literal_eval(text)
+
+
+def write_app_factors(schemas: Path, factors: dict[str, float]) -> None:
+    for key in FACTOR_KEYS:
+        merged = read_app_factors(schemas, key) | factors
+        _gsettings(schemas, "set", SCHEMA_ID, key, repr(merged))
+
+
 def is_enabled() -> bool:
-    shell = Gio.Settings.new("org.gnome.shell")
-    return UUID in shell.get_strv("enabled-extensions") and not shell.get_boolean("disable-user-extensions")
+    try:
+        out = subprocess.run(["gnome-extensions", "list", "--enabled"], capture_output=True, text=True).stdout
+    except FileNotFoundError:
+        return False
+    return UUID in out.split()
 
 
 def set_enabled(enabled: bool) -> None:
     subprocess.run(["gnome-extensions", "enable" if enabled else "disable", UUID], check=True)
-
-
-def write_app_factors(settings: Gio.Settings, factors: dict[str, float]) -> None:
-    for key in ("app-factors", "h-app-factors"):
-        merged = settings.get_value(key).unpack() | factors
-        settings.set_value(key, GLib.Variant("a{sd}", merged))
-    Gio.Settings.sync()
 
 
 def export_json(path: Path, factors: dict[str, float], global_factor: float) -> None:
@@ -48,9 +58,26 @@ def export_json(path: Path, factors: dict[str, float], global_factor: float) -> 
 
 
 def installed_apps() -> dict[str, str]:
-    apps = {}
-    for info in Gio.AppInfo.get_all():
-        app_id = info.get_id() or ""
-        if info.should_show() and app_id.endswith(".desktop"):
-            apps[app_id.removesuffix(".desktop")] = info.get_display_name()
+    apps: dict[str, str] = {}
+    for base in _data_dirs():
+        root = base / "applications"
+        for desktop_file in sorted(root.rglob("*.desktop")):
+            app_id = str(desktop_file.relative_to(root)).replace("/", "-").removesuffix(".desktop")
+            if app_id in apps:
+                continue
+            name = _visible_app_name(desktop_file)
+            if name:
+                apps[app_id] = name
     return dict(sorted(apps.items()))
+
+
+def _visible_app_name(desktop_file: Path) -> str | None:
+    parser = configparser.ConfigParser(interpolation=None, strict=False)
+    try:
+        parser.read(desktop_file, encoding="utf-8")
+        entry = parser["Desktop Entry"]
+    except (configparser.Error, UnicodeDecodeError, KeyError):
+        return None
+    if entry.get("type") != "Application" or "true" in (entry.get("nodisplay"), entry.get("hidden")):
+        return None
+    return entry.get("name")
