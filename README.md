@@ -1,8 +1,8 @@
 # Scroll Gauge
 
-Measures each app's touchpad scroll speed and sets per-app factors so one swipe scrolls the same distance everywhere.
+A small window for setting touchpad scroll speed on GNOME Wayland: one global speed, per-app speeds, and a demo page to feel the result while you drag the slider.
 
-[WSF](https://github.com/daniel-g-carrasco/wayland-scroll-factor) applies one global factor and [Touchpad Speed Control](https://github.com/ritesh-777/touchpad-speed-control) applies per-app factors, but you have to find each value by trial and error. Scroll Gauge measures them for you.
+WSF's own window only sets one global speed, and Touchpad Speed Control's settings only set per-app speeds, and neither lets you try the speed while you adjust it. Scroll Gauge puts both in one window with a live demo.
 
 ## Where it runs
 
@@ -10,9 +10,9 @@ Linux, GNOME on Wayland, any distribution. Not GNOME on X11 or other desktops (W
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.11+ with tkinter: `sudo dnf install python3-tkinter` (Fedora), `sudo apt install python3-tk` (Ubuntu/Debian), `sudo pacman -S tk` (Arch)
 - [WSF](https://github.com/daniel-g-carrasco/wayland-scroll-factor), enabled with `wsf enable`
-- [Touchpad Speed Control](https://extensions.gnome.org/extension/10008/touchpad-speed-control/) (optional; without it, use `--json`)
+- [Touchpad Speed Control](https://extensions.gnome.org/extension/10008/touchpad-speed-control/) for per-app speeds (optional)
 
 ## Install
 
@@ -22,37 +22,21 @@ cd Scroll-Gauge
 pip install .
 ```
 
-Allow access to `/dev/uinput`:
-
-```bash
-echo 'KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/60-uinput.rules
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-```
-
 ## Usage
 
-```bash
-scrollgauge apps firefox                                                 # find app ids
-scrollgauge run org.gnome.Ptyxis org.mozilla.firefox org.gnome.Nautilus  # first id is the reference
-```
+Run `scrollgauge`.
 
-For each app, press Enter, then hover over long static content (e.g. `seq 1 5000` in a terminal).
+- **Global speed:** used by every app without its own speed.
+- **Per-app speeds:** pick an app, press Add, then drag its slider. Touchpad Speed Control switches to it whenever you use that app.
+- **Try it:** swipe on the demo text. Moving any slider applies that speed to the demo straight away, and the window shows how many lines your last swipe moved.
 
-| Option | Effect |
-| --- | --- |
-| `--reference-factor F` | Reference app's factor (default: current WSF factor) |
-| `--samples N` | Swipes per app (default 3) |
-| `--dry-run` | Print factors without saving |
-| `--json PATH` | Write a Touchpad Speed Control import file |
-
-`scrollgauge measure` measures the app under the pointer.
+Changes save automatically.
 
 ## Limitations
 
-- Only vertical scrolling is measured. The same factor is applied horizontally.
-- Animated or lazy-loading pages can give unreliable readings. Pages with low-confidence readings are skipped.
-- GNOME may ask once for permission to take screenshots.
+- The demo shows the speed in Scroll Gauge's own window. Apps scale scrolling differently, so the same speed can still feel a little different elsewhere.
+- Per-app speeds need Touchpad Speed Control.
+- Horizontal scrolling gets the same speed as vertical.
 
 ## Development
 
