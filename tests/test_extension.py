@@ -21,4 +21,8 @@ def test_parse_empty_factors():
 def test_merge_keeps_other_apps_and_applies_changes():
     stored = {"org.gnome.Nautilus": 0.5, "org.gnome.Ptyxis": 0.2, "com.discordapp.Discord": 0.05}
     changes = {"org.gnome.Ptyxis": 0.1, "com.discordapp.Discord": None, "org.gnome.Loupe": 0.3}
-    assert merge_factors(stored, changes) == {"org.gnome.Nautilus": 0.5, "org.gnome.Ptyxis": 0.1, "org.gnome.Loupe": 0.3}
+    assert merge_factors(stored, changes) == {
+        "org.gnome.Nautilus": 0.5,
+        "org.gnome.Ptyxis": 0.1,
+        "org.gnome.Loupe": 0.3,
+    }

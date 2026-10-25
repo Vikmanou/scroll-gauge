@@ -1,3 +1,4 @@
+import contextlib
 import textwrap
 from collections.abc import Callable
 from itertools import cycle, islice
@@ -16,20 +17,20 @@ SAVE_DELAY_MS = 300
 SWIPE_GAP_MS = 350
 EXTENSION_URL = "https://extensions.gnome.org/extension/10008/touchpad-speed-control/"
 DEMO_LINES = 400
-LOREM_IPSUM = (
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris tristique viverra lobortis. Proin sem velit, "
-    "hendrerit condimentum tortor sit amet, rutrum ornare ipsum. Pellentesque auctor et metus id condimentum. Morbi in "
-    "facilisis metus, ac placerat purus. Nunc faucibus pulvinar est, vitae dictum nibh condimentum nec. Nulla et "
-    "accumsan enim. Praesent ultrices malesuada velit, in sagittis odio suscipit a. Maecenas scelerisque quis tellus ut "
-    "vulputate. Proin vel nisl blandit, convallis est vel, faucibus libero. Fusce ut porta mauris, at aliquam justo. "
-    "Phasellus erat nulla, semper a hendrerit elementum, pharetra at ante. Proin laoreet lobortis ipsum ac euismod. "
-    "Phasellus sit amet aliquet enim. Vestibulum sit amet urna nec purus efficitur consectetur quis at turpis. Morbi "
-    "tristique turpis enim, et feugiat ex pellentesque id. Nulla eget varius neque. Pellentesque eu purus vel diam "
-    "lacinia ultricies et id massa. Aliquam luctus libero sit amet pretium vehicula. Donec quis pharetra neque, eget "
-    "laoreet erat. Mauris egestas ornare ante, in maximus velit lacinia laoreet. Suspendisse potenti. Quisque pretium "
-    "enim sed consectetur eleifend. Suspendisse in ligula a lacus finibus hendrerit. Morbi tempus non leo vitae "
-    "imperdiet. Sed dictum nibh ac mattis posuere."
-)
+LOREM_IPSUM = """\
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris tristique viverra lobortis. Proin sem velit,
+hendrerit condimentum tortor sit amet, rutrum ornare ipsum. Pellentesque auctor et metus id condimentum. Morbi
+in facilisis metus, ac placerat purus. Nunc faucibus pulvinar est, vitae dictum nibh condimentum nec. Nulla et
+accumsan enim. Praesent ultrices malesuada velit, in sagittis odio suscipit a. Maecenas scelerisque quis
+tellus ut vulputate. Proin vel nisl blandit, convallis est vel, faucibus libero. Fusce ut porta mauris, at
+aliquam justo. Phasellus erat nulla, semper a hendrerit elementum, pharetra at ante. Proin laoreet lobortis
+ipsum ac euismod. Phasellus sit amet aliquet enim. Vestibulum sit amet urna nec purus efficitur consectetur
+quis at turpis. Morbi tristique turpis enim, et feugiat ex pellentesque id. Nulla eget varius neque.
+Pellentesque eu purus vel diam lacinia ultricies et id massa. Aliquam luctus libero sit amet pretium vehicula.
+Donec quis pharetra neque, eget laoreet erat. Mauris egestas ornare ante, in maximus velit lacinia laoreet.
+Suspendisse potenti. Quisque pretium enim sed consectetur eleifend. Suspendisse in ligula a lacus finibus
+hendrerit. Morbi tempus non leo vitae imperdiet. Sed dictum nibh ac mattis posuere.
+"""
 
 
 def demo_text() -> str:
@@ -54,7 +55,12 @@ class SpeedControl(Gtk.Box):
         scale.set_size_request(200, -1)
         scale.add_mark(DEFAULT_SPEED, Gtk.PositionType.BOTTOM, None)
         spin = Gtk.SpinButton(
-            adjustment=self.adjustment, digits=2, climb_rate=0.05, numeric=True, width_chars=4, valign=Gtk.Align.CENTER,
+            adjustment=self.adjustment,
+            digits=2,
+            climb_rate=0.05,
+            numeric=True,
+            width_chars=4,
+            valign=Gtk.Align.CENTER,
             tooltip_text="Type an exact speed or step it with − and +",
         )
         button.add_css_class("flat")
@@ -97,14 +103,18 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         view.add_top_bar(header)
         self.set_content(view)
         if not wsf.is_active():
-            view.add_top_bar(Adw.Banner(
-                title="WSF isn't active in this session. Run “wsf enable”, then log out and back in.", revealed=True
-            ))
+            view.add_top_bar(
+                Adw.Banner(
+                    title="WSF isn't active in this session. Run “wsf enable”, then log out and back in.", revealed=True
+                )
+            )
 
         try:
             current = wsf.read().vertical
         except wsf.WsfError as err:
-            view.set_content(Adw.StatusPage(icon_name="dialog-warning-symbolic", title="WSF Not Found", description=str(err)))
+            view.set_content(
+                Adw.StatusPage(icon_name="dialog-warning-symbolic", title="WSF Not Found", description=str(err))
+            )
             return
         if self.schemas:
             if extension.is_customized("global-factor"):
@@ -126,8 +136,10 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
 
     def _watch_for_outside_changes(self) -> None:
         if self.schemas is None:
-            self.config_monitor = Gio.File.new_for_path(str(wsf.CONFIG_PATH)).monitor_file(Gio.FileMonitorFlags.NONE, None)
-            self.config_monitor.connect("changed", lambda *_: self._sync_global(wsf.read().vertical))
+            self.config_monitor = Gio.File.new_for_path(str(wsf.CONFIG_PATH)).monitor_file(
+                Gio.FileMonitorFlags.NONE, None
+            )
+            self.config_monitor.connect("changed", lambda *_: self._on_wsf_config_changed())
             return
         source = Gio.SettingsSchemaSource.new_from_directory(
             str(self.schemas), Gio.SettingsSchemaSource.get_default(), False
@@ -140,6 +152,10 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         # GSettings only reports changes to keys that have been read at least once.
         self.extension_settings.get_value("app-factors")
         self.extension_settings.get_double("global-factor")
+
+    def _on_wsf_config_changed(self) -> None:
+        with contextlib.suppress(wsf.WsfError):
+            self._sync_global(wsf.read().vertical)
 
     def _sync_global(self, value: float) -> None:
         value = round(value, 2)
@@ -172,7 +188,9 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         )
         row = Adw.ActionRow(title="Touchpad scroll", title_lines=1, activatable=False)
         row.add_prefix(Gtk.Image.new_from_icon_name("input-touchpad-symbolic"))
-        reset = Gtk.Button(icon_name="edit-undo-symbolic", tooltip_text=f"Reset to the system default ({DEFAULT_SPEED:.2f})")
+        reset = Gtk.Button(
+            icon_name="edit-undo-symbolic", tooltip_text=f"Reset to the system default ({DEFAULT_SPEED:.2f})"
+        )
         self.global_control = SpeedControl(current, self._on_global, reset)
         reset.connect("clicked", lambda _: self.global_control.adjustment.set_value(DEFAULT_SPEED))
 
@@ -191,7 +209,9 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         if self.schemas is None:
             group.set_description("Needs the Touchpad Speed Control extension.")
             row = Adw.ActionRow(
-                title="Get Touchpad Speed Control", subtitle="extensions.gnome.org", activatable=True,
+                title="Get Touchpad Speed Control",
+                subtitle="extensions.gnome.org",
+                activatable=True,
                 tooltip_text="Open the extension's page in your browser",
             )
             row.add_suffix(Gtk.Image.new_from_icon_name("adw-external-link-symbolic"))
@@ -206,19 +226,27 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         if not extension.is_enabled():
             off_row = Adw.ActionRow(title="Touchpad Speed Control is off", subtitle="Per-app speeds apply once it's on")
             turn_on = Gtk.Button(
-                label="Turn On", valign=Gtk.Align.CENTER, tooltip_text="Turn on Touchpad Speed Control so per-app speeds apply"
+                label="Turn On",
+                valign=Gtk.Align.CENTER,
+                tooltip_text="Turn on Touchpad Speed Control so per-app speeds apply",
             )
             turn_on.add_css_class("suggested-action")
-            turn_on.connect("clicked", lambda _: (extension.enable(), group.remove(off_row)))
+            turn_on.connect("clicked", self._on_turn_on, off_row)
             off_row.add_suffix(turn_on)
             group.add(off_row)
 
         self.empty_row = Adw.ActionRow(title="No apps yet", subtitle="Use Add App to give an app its own speed")
         group.add(self.empty_row)
-        for app_id in sorted((a for a in self.factors if a in self.apps), key=lambda a: self.apps[a].get_display_name()):
+        for app_id in sorted(
+            (a for a in self.factors if a in self.apps), key=lambda a: self.apps[a].get_display_name()
+        ):
             self._add_app_row(app_id)
         self._update_empty_row()
         return group
+
+    def _on_turn_on(self, _button: Gtk.Button, off_row: Adw.ActionRow) -> None:
+        extension.enable()
+        self.per_app_group.remove(off_row)
 
     def _build_add_button(self) -> Gtk.MenuButton:
         self.search = Gtk.SearchEntry(placeholder_text="Search apps")
@@ -250,8 +278,15 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         buffer = Gtk.TextBuffer()
         buffer.set_text(demo_text())
         self.demo = Gtk.TextView(
-            buffer=buffer, editable=False, cursor_visible=False, monospace=True,
-            top_margin=12, bottom_margin=12, left_margin=16, right_margin=16, pixels_below_lines=8,
+            buffer=buffer,
+            editable=False,
+            cursor_visible=False,
+            monospace=True,
+            top_margin=12,
+            bottom_margin=12,
+            left_margin=16,
+            right_margin=16,
+            pixels_below_lines=8,
         )
         self.demo_scroller = Gtk.ScrolledWindow(child=self.demo, height_request=280)
         self.demo_scroller.get_vadjustment().connect("value-changed", self._on_demo_scroll)
@@ -270,7 +305,8 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         row = Adw.ActionRow(title=info.get_display_name(), title_lines=1, activatable=False)
         row.add_prefix(app_icon(info, 32))
         remove = Gtk.Button(
-            icon_name="user-trash-symbolic", tooltip_text=f"Remove {info.get_display_name()}; it will use the global speed"
+            icon_name="user-trash-symbolic",
+            tooltip_text=f"Remove {info.get_display_name()}; it will use the global speed",
         )
         control = SpeedControl(self.factors[app_id], lambda value: self._on_app_speed(app_id, value), remove)
         remove.connect("clicked", lambda _: self._remove_app(app_id))
