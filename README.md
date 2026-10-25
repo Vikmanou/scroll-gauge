@@ -36,7 +36,7 @@ gdbus call --session --dest org.gnome.Shell.Extensions --object-path /org/gnome/
 Run `scrollgauge`.
 
 - **Global speed:** used by every app without its own speed.
-- **Per-app speeds:** pick an app, press Add, then drag its slider. Touchpad Speed Control switches to it whenever you use that app, so test it in the app itself.
+- **Per-app speeds:** starts with Files and Terminal. Pick an app, press Add, then drag its slider. Touchpad Speed Control switches to it whenever you use that app, so test it in the app itself.
 - **Try it:** swipe on the demo text to feel the global speed. Changes apply straight away, and the window shows how many lines your last swipe moved.
 
 Changes save automatically.
