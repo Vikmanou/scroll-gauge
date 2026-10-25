@@ -22,10 +22,25 @@ Scroll Gauge works them out for you. It sends an identical swipe from a virtual 
 ```bash
 git clone https://github.com/Vikmanou/Scroll-Gauge.git
 cd Scroll-Gauge
-./install.sh
+pip install -r requirements.txt
+pip install .
 ```
 
-The script installs `python3-evdev`, `python3-numpy`, `python3-pillow` and `python3-gobject` with dnf. It adds a udev rule that gives the logged-in user access to `/dev/uinput` (via `uaccess`, not the `input` group), and puts a `scrollgauge` launcher in `~/.local/bin`. Run `./install.sh --uninstall` to remove the rule and launcher.
+`evdev` and `PyGObject` build from source, so you need the usual build packages first. On Fedora:
+
+```bash
+sudo dnf install gcc python3-devel kernel-headers gobject-introspection-devel cairo-gobject-devel
+```
+
+### Allow access to /dev/uinput
+
+Creating the virtual touchpad needs write access to `/dev/uinput`, which is root-only by default. Add a udev rule that grants it to the logged-in user:
+
+```bash
+echo 'KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/60-uinput.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
 
 ## Usage
 
@@ -61,7 +76,8 @@ For each app, press Enter and then hover the pointer over long, static content, 
 ## Development
 
 ```bash
-python3 -m pytest
+pip install -e '.[test]'
+pytest
 ```
 
 ## License
