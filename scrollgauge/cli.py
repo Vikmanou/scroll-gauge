@@ -5,6 +5,8 @@ from pathlib import Path
 
 from . import __version__, extension, wsf
 from .calibrate import Gauge, balanced_factors
+from .capture import Screenshotter
+from .vtouchpad import VirtualTouchpad
 
 # Linear scaling makes the factor cancel out; a low one keeps each swipe's
 # scroll well inside the measured region so the offset can't alias.
@@ -14,13 +16,10 @@ DEVICE_WARMUP_S = 1.0
 
 
 def _open_gauge(samples: int):
-    from .capture import Screenshotter
-    from .vtouchpad import VirtualTouchpad
-
     try:
         pad = VirtualTouchpad()
     except PermissionError:
-        sys.exit("No access to /dev/uinput. See "Allow access to /dev/uinput" in the README.")
+        sys.exit("No access to /dev/uinput. See 'Allow access to /dev/uinput' in the README.")
     time.sleep(DEVICE_WARMUP_S)
     return pad, Gauge(pad, Screenshotter(), samples)
 
@@ -89,9 +88,9 @@ def cmd_run(args) -> None:
 
     if args.dry_run:
         return
-    settings = extension.load_settings()
-    if settings is not None and args.json is None:
-        extension.write_app_factors(settings, factors)
+    schemas = extension.schema_dir()
+    if schemas is not None and args.json is None:
+        extension.write_app_factors(schemas, factors)
         print("\nSaved to Touchpad Speed Control.")
     else:
         path = args.json or Path("scrollgauge-factors.json")
