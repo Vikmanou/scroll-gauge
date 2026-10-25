@@ -1,13 +1,8 @@
-from __future__ import annotations
-
 from statistics import median
-from typing import TYPE_CHECKING
 
+from .capture import Screenshotter
 from .measure import vertical_shift
-
-if TYPE_CHECKING:
-    from .capture import Screenshotter
-    from .vtouchpad import VirtualTouchpad
+from .vtouchpad import VirtualTouchpad
 
 MIN_FACTOR, MAX_FACTOR = 0.05, 5.0
 MIN_CONFIDENCE = 0.08
