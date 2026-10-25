@@ -20,7 +20,7 @@ def _open_gauge(samples: int):
     try:
         pad = VirtualTouchpad()
     except PermissionError:
-        sys.exit("No access to /dev/uinput. Run ./install.sh, then log out and back in.")
+        sys.exit("No access to /dev/uinput. See "Allow access to /dev/uinput" in the README.")
     time.sleep(DEVICE_WARMUP_S)
     return pad, Gauge(pad, Screenshotter(), samples)
 
