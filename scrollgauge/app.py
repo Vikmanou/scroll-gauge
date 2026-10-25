@@ -82,6 +82,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         self.app_rows: dict[str, Adw.ActionRow] = {}
         self.controls = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
         self._pending: dict[str, tuple[int, Callable[[], None]]] = {}
+        self._unsaved: dict[str, float | None] = {}
         self._swipe_timeout = 0
         self._swipe_start = 0
         self._settled_line = 0
@@ -256,13 +257,18 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
 
     def _on_global(self, value: float) -> None:
         self._show_demo_speed(value)
-        self._later("wsf", lambda: wsf.write(wsf.Factors(value, value)))
-        if self.schemas:
-            self._later("global", lambda: extension.save_global_factor(self.schemas, value))
+
+        def save() -> None:
+            if self.schemas:
+                extension.save_global_factor(self.schemas, value)
+            if not self._reapply_extension():
+                wsf.write(wsf.Factors(value, value))
+
+        self._later("global", save)
 
     def _on_app_speed(self, app_id: str, value: float) -> None:
         self.factors[app_id] = value
-        self._save_factors()
+        self._save_app(app_id)
 
     def _on_pick_app(self, _list: Gtk.ListBox, row: Gtk.ListBoxRow) -> None:
         app_id = row.get_name()
@@ -272,18 +278,30 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         self._add_app_row(app_id)
         self._refresh_app_list()
         self._update_empty_row()
-        self._save_factors()
+        self._save_app(app_id)
 
     def _remove_app(self, app_id: str) -> None:
         del self.factors[app_id]
         self.per_app_group.remove(self.app_rows.pop(app_id))
         self._refresh_app_list()
         self._update_empty_row()
-        self._save_factors()
+        self._save_app(app_id)
 
-    def _save_factors(self) -> None:
-        factors = dict(self.factors)
-        self._later("factors", lambda: extension.save_app_factors(self.schemas, factors))
+    def _save_app(self, app_id: str) -> None:
+        self._unsaved[app_id] = self.factors.get(app_id)
+
+        def save() -> None:
+            changes, self._unsaved = self._unsaved, {}
+            extension.update_app_factors(self.schemas, changes)
+            self._reapply_extension()
+
+        self._later("factors", save)
+
+    def _reapply_extension(self) -> bool:
+        if self.schemas is None or not extension.is_enabled():
+            return False
+        extension.reapply()
+        return True
 
     def _show_demo_speed(self, value: float) -> None:
         self._demo_speed = f"Global speed {value:.2f}"
