@@ -1,28 +1,37 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "scrollgauge"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Set global and per-app touchpad scroll speed on GNOME Wayland"
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Viken" }]
 requires-python = ">=3.11"
+keywords = ["gnome", "wayland", "touchpad", "scrolling", "gtk", "libadwaita"]
 classifiers = [
-    "Operating System :: POSIX :: Linux",
+    "Development Status :: 4 - Beta",
     "Environment :: X11 Applications :: GTK",
-    "Topic :: Desktop Environment :: Gnome",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Desktop Environment :: Gnome",
 ]
 dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
 
 [project.urls]
 Homepage = "https://github.com/Vikmanou/scroll-gauge"
 Issues = "https://github.com/Vikmanou/scroll-gauge/issues"
-
-[project.optional-dependencies]
-test = ["pytest"]
 
 [project.gui-scripts]
 scrollgauge = "scrollgauge.app:main"
@@ -30,5 +39,22 @@ scrollgauge = "scrollgauge.app:main"
 [tool.setuptools]
 packages = ["scrollgauge"]
 
+[tool.setuptools.dynamic]
+version = { attr = "scrollgauge.__version__" }
+
 [tool.setuptools.data-files]
 "share/applications" = ["data/io.github.vikmanou.ScrollGauge.desktop"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# gi.require_version() must run before importing from gi.repository.
+"scrollgauge/app.py" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
