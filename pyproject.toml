@@ -15,7 +15,7 @@ classifiers = [
     "Topic :: Desktop Environment :: Gnome",
     "Programming Language :: Python :: 3",
 ]
-dependencies = ["numpy", "evdev", "Pillow", "PyGObject"]
+dependencies = ["numpy", "Pillow", "jeepney"]
 
 [project.optional-dependencies]
 test = ["pytest"]

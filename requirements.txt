@@ -1,4 +1,3 @@
 numpy
-evdev
 Pillow
-PyGObject
+jeepney
