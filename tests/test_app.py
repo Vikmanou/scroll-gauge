@@ -1,7 +1,8 @@
 import pytest
 
 pytest.importorskip("gi")
-app = pytest.importorskip("scrollgauge.app", exc_type=ImportError)
+
+from scrollgauge import app  # noqa: E402
 
 
 def test_demo_text_has_numbered_lines():
