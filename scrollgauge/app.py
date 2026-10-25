@@ -80,9 +80,11 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
             if info.should_show() and info.get_id() and info.get_id() != f"{APP_ID}.desktop"
         }
         self.app_rows: dict[str, Adw.ActionRow] = {}
+        self.app_controls: dict[str, SpeedControl] = {}
         self.controls = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
         self._pending: dict[str, tuple[int, Callable[[], None]]] = {}
         self._unsaved: dict[str, float | None] = {}
+        self._syncing = False
         self._swipe_timeout = 0
         self._swipe_start = 0
         self._settled_line = 0
@@ -119,7 +121,50 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         page.add(self._build_demo())
         view.set_content(page)
         self._show_demo_speed(current)
+        self._watch_for_outside_changes()
         self.connect("close-request", self._on_close)
+
+    def _watch_for_outside_changes(self) -> None:
+        if self.schemas is None:
+            self.config_monitor = Gio.File.new_for_path(str(wsf.CONFIG_PATH)).monitor_file(Gio.FileMonitorFlags.NONE, None)
+            self.config_monitor.connect("changed", lambda *_: self._sync_global(wsf.read().vertical))
+            return
+        source = Gio.SettingsSchemaSource.new_from_directory(
+            str(self.schemas), Gio.SettingsSchemaSource.get_default(), False
+        )
+        self.extension_settings = Gio.Settings.new_full(source.lookup(extension.SCHEMA_ID, False), None, None)
+        self.extension_settings.connect("changed::app-factors", lambda *_: self._sync_app_factors())
+        self.extension_settings.connect(
+            "changed::global-factor", lambda *_: self._sync_global(self.extension_settings.get_double("global-factor"))
+        )
+        # GSettings only reports changes to keys that have been read at least once.
+        self.extension_settings.get_value("app-factors")
+        self.extension_settings.get_double("global-factor")
+
+    def _sync_global(self, value: float) -> None:
+        value = round(value, 2)
+        if "global" in self._pending or value == self.global_control.value:
+            return
+        self._syncing = True
+        self.global_control.adjustment.set_value(value)
+        self._syncing = False
+        self._show_demo_speed(value)
+
+    def _sync_app_factors(self) -> None:
+        stored = self.extension_settings.get_value("app-factors").unpack()
+        self.factors = extension.merge_factors(stored, self._unsaved)
+        visible = {app_id for app_id in self.factors if app_id in self.apps}
+        self._syncing = True
+        for app_id in set(self.app_rows) - visible:
+            self.per_app_group.remove(self.app_rows.pop(app_id))
+            del self.app_controls[app_id]
+        for app_id in sorted(visible - set(self.app_rows), key=lambda a: self.apps[a].get_display_name()):
+            self._add_app_row(app_id)
+        for app_id in visible:
+            self.app_controls[app_id].adjustment.set_value(self.factors[app_id])
+        self._syncing = False
+        self._refresh_app_list()
+        self._update_empty_row()
 
     def _build_global(self, current: float) -> Adw.PreferencesGroup:
         group = Adw.PreferencesGroup(
@@ -235,6 +280,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         row.add_suffix(control)
         self.per_app_group.add(row)
         self.app_rows[app_id] = row
+        self.app_controls[app_id] = control
 
     def _refresh_app_list(self) -> None:
         self.app_list.remove_all()
@@ -256,6 +302,8 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         self.empty_row.set_visible(not self.app_rows)
 
     def _on_global(self, value: float) -> None:
+        if self._syncing:
+            return
         self._show_demo_speed(value)
 
         def save() -> None:
@@ -267,6 +315,8 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         self._later("global", save)
 
     def _on_app_speed(self, app_id: str, value: float) -> None:
+        if self._syncing:
+            return
         self.factors[app_id] = value
         self._save_app(app_id)
 
@@ -283,6 +333,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
     def _remove_app(self, app_id: str) -> None:
         del self.factors[app_id]
         self.per_app_group.remove(self.app_rows.pop(app_id))
+        del self.app_controls[app_id]
         self._refresh_app_list()
         self._update_empty_row()
         self._save_app(app_id)
