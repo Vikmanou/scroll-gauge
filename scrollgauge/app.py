@@ -70,14 +70,14 @@ class SpeedControl(Gtk.Box):
 
 class ScrollGaugeWindow(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application):
-        super().__init__(application=app, title="Scroll Gauge", default_width=640, default_height=780)
+        super().__init__(application=app, title="Scroll Gauge", default_width=640, default_height=700)
         self.set_size_request(520, -1)
         self.schemas = extension.schema_dir()
         self.factors = extension.load_app_factors(self.schemas) if self.schemas else {}
         self.apps = {
             info.get_id().removesuffix(".desktop"): info
             for info in Gio.AppInfo.get_all()
-            if info.should_show() and info.get_id()
+            if info.should_show() and info.get_id() and info.get_id() != f"{APP_ID}.desktop"
         }
         self.app_rows: dict[str, Adw.ActionRow] = {}
         self.controls = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
@@ -93,6 +93,10 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         view = Adw.ToolbarView()
         view.add_top_bar(header)
         self.set_content(view)
+        if not wsf.is_active():
+            view.add_top_bar(Adw.Banner(
+                title="WSF isn't active in this session. Run “wsf enable”, then log out and back in.", revealed=True
+            ))
 
         try:
             current = wsf.read().vertical
@@ -113,7 +117,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         page.add(self._build_per_app())
         page.add(self._build_demo())
         view.set_content(page)
-        self._apply_global(current)
+        self._show_demo_speed(current)
         self.connect("close-request", self._on_close)
 
     def _build_global(self, current: float) -> Adw.PreferencesGroup:
@@ -251,7 +255,8 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         self.empty_row.set_visible(not self.app_rows)
 
     def _on_global(self, value: float) -> None:
-        self._apply_global(value)
+        self._show_demo_speed(value)
+        self._later("wsf", lambda: wsf.write(wsf.Factors(value, value)))
         if self.schemas:
             self._later("global", lambda: extension.save_global_factor(self.schemas, value))
 
@@ -280,10 +285,9 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         factors = dict(self.factors)
         self._later("factors", lambda: extension.save_app_factors(self.schemas, factors))
 
-    def _apply_global(self, value: float) -> None:
+    def _show_demo_speed(self, value: float) -> None:
         self._demo_speed = f"Global speed {value:.2f}"
         self._update_demo_status()
-        self._later("wsf", lambda: wsf.write(wsf.Factors(value, value)))
 
     def _on_demo_scroll(self, _adjustment: Gtk.Adjustment) -> None:
         if self._swipe_timeout:
@@ -321,8 +325,6 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
             GLib.source_remove(source)
             action()
         self._pending.clear()
-        value = self.global_control.value
-        wsf.write(wsf.Factors(value, value))
         return False
 
 
