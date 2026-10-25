@@ -1,13 +1,11 @@
 import ast
 import configparser
-import json
 import os
 import subprocess
 from pathlib import Path
 
 UUID = "touchpad-speed-control@ritesh"
 SCHEMA_ID = "org.gnome.shell.extensions.touchpad-speed-control"
-FACTOR_KEYS = ("app-factors", "h-app-factors")
 
 
 def _data_dirs() -> list[Path]:
@@ -29,15 +27,23 @@ def _gsettings(schemas: Path, *args: str) -> str:
     return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout.strip()
 
 
-def read_app_factors(schemas: Path, key: str = "app-factors") -> dict[str, float]:
-    text = _gsettings(schemas, "get", SCHEMA_ID, key).removeprefix("@a{sd} ")
-    return ast.literal_eval(text)
+def parse_factors(text: str) -> dict[str, float]:
+    return ast.literal_eval(text.removeprefix("@a{sd} "))
 
 
-def write_app_factors(schemas: Path, factors: dict[str, float]) -> None:
-    for key in FACTOR_KEYS:
-        merged = read_app_factors(schemas, key) | factors
-        _gsettings(schemas, "set", SCHEMA_ID, key, repr(merged))
+def load_app_factors(schemas: Path) -> dict[str, float]:
+    return parse_factors(_gsettings(schemas, "get", SCHEMA_ID, "app-factors"))
+
+
+def save_app_factors(schemas: Path, factors: dict[str, float]) -> None:
+    value = repr(factors) if factors else "@a{sd} {}"
+    for key in ("app-factors", "h-app-factors"):
+        _gsettings(schemas, "set", SCHEMA_ID, key, value)
+
+
+def save_global_factor(schemas: Path, factor: float) -> None:
+    for key in ("global-factor", "h-global-factor"):
+        _gsettings(schemas, "set", SCHEMA_ID, key, f"{factor:.2f}")
 
 
 def is_enabled() -> bool:
@@ -48,13 +54,8 @@ def is_enabled() -> bool:
     return UUID in out.split()
 
 
-def set_enabled(enabled: bool) -> None:
-    subprocess.run(["gnome-extensions", "enable" if enabled else "disable", UUID], check=True)
-
-
-def export_json(path: Path, factors: dict[str, float], global_factor: float) -> None:
-    axis = {"global_factor": global_factor, "app_factors": factors}
-    path.write_text(json.dumps({"version": 1, "vertical": axis, "horizontal": axis}, indent=2) + "\n")
+def enable() -> None:
+    subprocess.run(["gnome-extensions", "enable", UUID], check=True)
 
 
 def installed_apps() -> dict[str, str]:
@@ -65,13 +66,13 @@ def installed_apps() -> dict[str, str]:
             app_id = str(desktop_file.relative_to(root)).replace("/", "-").removesuffix(".desktop")
             if app_id in apps:
                 continue
-            name = _visible_app_name(desktop_file)
+            name = visible_app_name(desktop_file)
             if name:
                 apps[app_id] = name
-    return dict(sorted(apps.items()))
+    return apps
 
 
-def _visible_app_name(desktop_file: Path) -> str | None:
+def visible_app_name(desktop_file: Path) -> str | None:
     parser = configparser.ConfigParser(interpolation=None, strict=False)
     try:
         parser.read(desktop_file, encoding="utf-8")
