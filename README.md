@@ -1,14 +1,16 @@
 # Scroll Gauge
 
-A GNOME app for setting touchpad scroll speed on GNOME Wayland: one global speed, per-app speeds, and a demo page to feel the result while you drag the slider.
+A GNOME app for setting touchpad scroll speed.
 
-WSF's own window only sets one global speed, and Touchpad Speed Control's settings only set per-app speeds, and neither lets you try the speed while you adjust it. Scroll Gauge puts both in one window with a live demo.
+WSF's own window only sets one global speed and Touchpad Speed Control's settings only set per-app speeds and neither lets you try the speed while you adjust it. Scroll Gauge puts both in one window with a live demo.
 
 ![Scroll Gauge](docs/screenshot.png)
 
 ## Where it runs
 
-Linux, GNOME on Wayland, any distribution. Not GNOME on X11 or other desktops (WSF is GNOME Wayland only). Tested on Fedora 44, GNOME 50.
+Linux, GNOME on Wayland, any distribution. Not GNOME on X11 or other desktops (WSF is GNOME Wayland only).
+
+Tested on Fedora 44, GNOME 50.
 
 ## Requirements
 
@@ -24,7 +26,7 @@ cd scroll-gauge
 pip install .
 ```
 
-Optional, for per-app speeds: install Touchpad Speed Control (GNOME asks you to confirm):
+[Optional] for per-app speeds: install Touchpad Speed Control
 
 ```bash
 gdbus call --session --dest org.gnome.Shell.Extensions --object-path /org/gnome/Shell/Extensions \
@@ -33,11 +35,7 @@ gdbus call --session --dest org.gnome.Shell.Extensions --object-path /org/gnome/
 
 ## Usage
 
-Open Scroll Gauge from the app grid, or run `scrollgauge`.
-
-- **Global speed:** used by every app without its own speed.
-- **Per-app speeds:** starts with Files and Terminal. Pick an app, press Add, then drag its slider. Touchpad Speed Control switches to it whenever you use that app, so test it in the app itself.
-- **Try it:** swipe on the demo text to feel the global speed. Changes apply straight away, and the window shows how many lines your last swipe moved.
+Open Scroll Gauge from the app grid or run `scrollgauge`.
 
 Changes save automatically.
 
