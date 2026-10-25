@@ -1,5 +1,7 @@
 # Scroll Gauge
 
+[![CI](https://github.com/Vikmanou/scroll-gauge/actions/workflows/ci.yml/badge.svg)](https://github.com/Vikmanou/scroll-gauge/actions/workflows/ci.yml)
+
 A GNOME app for setting touchpad scroll speed.
 
 WSF's own window only sets one global speed and Touchpad Speed Control's settings only set per-app speeds and neither lets you try the speed while you adjust it. Scroll Gauge puts both in one window with a live demo.
@@ -49,10 +51,13 @@ Changes save automatically.
 ## Development
 
 ```bash
-pip install -e '.[test]'
+pip install -e '.[dev]'
 pytest
+ruff check . && ruff format --check .
 ```
+
+CI runs the same checks on Python 3.11–3.14.
 
 ## License
 
-MIT
+[MIT](LICENSE)
