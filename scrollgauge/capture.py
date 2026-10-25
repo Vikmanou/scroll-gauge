@@ -4,11 +4,16 @@ import time
 from urllib.parse import unquote, urlparse
 
 import numpy as np
-from gi.repository import Gio, GLib
+from jeepney import DBusAddress, MatchRule, new_method_call
+from jeepney.bus_messages import message_bus
+from jeepney.io.blocking import open_dbus_connection
 from PIL import Image
 
-PORTAL = "org.freedesktop.portal.Desktop"
-PORTAL_PATH = "/org/freedesktop/portal/desktop"
+PORTAL = DBusAddress(
+    "/org/freedesktop/portal/desktop",
+    bus_name="org.freedesktop.portal.Desktop",
+    interface="org.freedesktop.portal.Screenshot",
+)
 TIMEOUT_S = 10
 
 
@@ -18,45 +23,33 @@ class CaptureError(RuntimeError):
 
 class Screenshotter:
     def __init__(self):
-        self._bus = Gio.bus_get_sync(Gio.BusType.SESSION)
-        self._sender = self._bus.get_unique_name()[1:].replace(".", "_")
+        self._conn = open_dbus_connection(bus="SESSION")
+        self._sender = self._conn.unique_name[1:].replace(".", "_")
 
     def grab(self) -> np.ndarray:
         token = "scrollgauge_" + secrets.token_hex(4)
-        handle = f"{PORTAL_PATH}/request/{self._sender}/{token}"
-        loop = GLib.MainLoop()
-        result: dict = {}
-
-        def on_response(_conn, _sender, _path, _iface, _signal, params):
-            result["code"], result["results"] = params.unpack()
-            loop.quit()
-
-        sub = self._bus.signal_subscribe(
-            PORTAL, "org.freedesktop.portal.Request", "Response", handle, None,
-            Gio.DBusSignalFlags.NO_MATCH_RULE, on_response,
+        response = MatchRule(
+            type="signal",
+            interface="org.freedesktop.portal.Request",
+            member="Response",
+            path=f"/org/freedesktop/portal/desktop/request/{self._sender}/{token}",
         )
-        timeout = GLib.timeout_add_seconds(TIMEOUT_S, loop.quit)
+        self._conn.send_and_get_reply(message_bus.AddMatch(response))
         try:
-            self._bus.call_sync(
-                PORTAL, PORTAL_PATH, "org.freedesktop.portal.Screenshot", "Screenshot",
-                GLib.Variant("(sa{sv})", ("", {
-                    "handle_token": GLib.Variant("s", token),
-                    "interactive": GLib.Variant("b", False),
-                })),
-                None, Gio.DBusCallFlags.NONE, -1, None,
-            )
-            loop.run()
+            with self._conn.filter(response) as queue:
+                options = {"handle_token": ("s", token), "interactive": ("b", False)}
+                self._conn.send_and_get_reply(new_method_call(PORTAL, "Screenshot", "sa{sv}", ("", options)))
+                try:
+                    code, results = self._conn.recv_until_filtered(queue, timeout=TIMEOUT_S).body
+                except TimeoutError:
+                    raise CaptureError("screenshot portal timed out") from None
         finally:
-            self._bus.signal_unsubscribe(sub)
-            if "code" in result:
-                GLib.source_remove(timeout)
+            self._conn.send_and_get_reply(message_bus.RemoveMatch(response))
 
-        if "code" not in result:
-            raise CaptureError("screenshot portal timed out")
-        if result["code"] != 0:
+        if code != 0:
             raise CaptureError("screenshot was denied; allow screenshots for scrollgauge and retry")
 
-        path = unquote(urlparse(result["results"]["uri"]).path)
+        path = unquote(urlparse(results["uri"][1]).path)
         try:
             with Image.open(path) as img:
                 return np.asarray(img.convert("RGB"))
