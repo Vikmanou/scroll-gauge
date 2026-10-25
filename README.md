@@ -2,7 +2,7 @@
 
 Measures each app's touchpad scroll speed and sets per-app factors so one swipe scrolls the same distance everywhere.
 
-[WSF](https://github.com/daniel-g-carrasco/wayland-scroll-factor) applies one global factor, and [Touchpad Speed Control](https://github.com/ritesh-777/touchpad-speed-control) applies per-app factors, but you have to find each value by trial and error. Scroll Gauge measures them for you.
+[WSF](https://github.com/daniel-g-carrasco/wayland-scroll-factor) applies one global factor and [Touchpad Speed Control](https://github.com/ritesh-777/touchpad-speed-control) applies per-app factors, but you have to find each value by trial and error. Scroll Gauge measures them for you.
 
 ## Where it runs
 
@@ -16,18 +16,9 @@ Linux, GNOME on Wayland, any distribution. Not GNOME on X11 or other desktops (W
 
 ## Install
 
-Build packages for `evdev` and `PyGObject`:
-
-```bash
-sudo dnf install gcc python3-devel kernel-headers gobject-introspection-devel cairo-gobject-devel  # Fedora
-sudo apt install build-essential python3-dev pkg-config libgirepository-2.0-dev libcairo2-dev       # Ubuntu/Debian
-sudo pacman -S base-devel linux-api-headers gobject-introspection cairo                            # Arch
-```
-
 ```bash
 git clone https://github.com/Vikmanou/Scroll-Gauge.git
 cd Scroll-Gauge
-pip install -r requirements.txt
 pip install .
 ```
 
