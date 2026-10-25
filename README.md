@@ -59,8 +59,9 @@ For each app, press Enter, then hover over long static content (e.g. `seq 1 5000
 
 ## Limitations
 
-- Only vertical scrolling is measured; horizontal gets the same factor.
-- Animated or lazy-loading content gives unreliable readings.
+- Only vertical scrolling is measured. The same factor is applied horizontally.
+- Animated or lazy-loading pages can give unreliable readings. Pages with low-confidence readings are skipped.
+- GNOME may ask once for permission to take screenshots.
 
 ## Development
 
