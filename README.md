@@ -22,10 +22,17 @@ Tested on Fedora 44, GNOME 50.
 
 ## Install
 
+Fedora (COPR):
+
 ```bash
-git clone https://github.com/Vikmanou/scroll-gauge.git
-cd scroll-gauge
-pip install .
+sudo dnf copr enable vikmanou/scrollgauge
+sudo dnf install scrollgauge
+```
+
+Any distribution (PyPI):
+
+```bash
+pip install scrollgauge
 ```
 
 [Optional] for per-app speeds: install Touchpad Speed Control
@@ -51,12 +58,14 @@ Changes save automatically.
 ## Development
 
 ```bash
+git clone https://github.com/Vikmanou/scroll-gauge.git
+cd scroll-gauge
 pip install -e '.[dev]'
 pytest
 ruff check . && ruff format --check .
 ```
 
-CI runs the same checks on Python 3.11–3.14.
+CI runs the same checks on Python 3.11–3.14. Releasing is described in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## License
 
