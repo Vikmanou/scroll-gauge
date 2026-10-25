@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scrollgauge"
+version = "0.1.0"
+description = "Auto-calibrate per-app touchpad scroll speed on GNOME Wayland"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+# PyGObject is not listed: it comes from the distro (python3-gobject).
+dependencies = ["numpy", "evdev", "Pillow"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+scrollgauge = "scrollgauge.cli:main"
+
+[tool.setuptools]
+packages = ["scrollgauge"]
