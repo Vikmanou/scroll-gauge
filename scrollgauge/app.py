@@ -86,7 +86,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         self._swipe_start = 0
         self._settled_line = 0
         self._last_swipe = "No swipe yet."
-        self._preview_text = ""
+        self._demo_speed = ""
 
         header = Adw.HeaderBar()
         header.set_title_widget(Adw.WindowTitle(title="Scroll Gauge", subtitle=f"v{__version__}"))
@@ -107,7 +107,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         page.add(self._build_per_app())
         page.add(self._build_demo())
         view.set_content(page)
-        self._preview(current, "Global speed")
+        self._apply_global(current)
         self.connect("close-request", self._on_close)
 
     def _build_global(self, current: float) -> Adw.PreferencesGroup:
@@ -143,7 +143,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
             group.add(row)
             return group
 
-        group.set_description("Applied automatically whenever you use the app.")
+        group.set_description("Applied automatically whenever you use the app. Try them out in the app itself.")
         group.set_header_suffix(self._build_add_button())
         self.per_app_group = group
 
@@ -191,7 +191,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
 
     def _build_demo(self) -> Adw.PreferencesGroup:
         group = Adw.PreferencesGroup(
-            title="Try It", description="Swipe on the text with two fingers. Moving a slider applies its speed here."
+            title="Try It", description="Swipe on the text with two fingers to feel the global speed."
         )
         buffer = Gtk.TextBuffer()
         buffer.set_text(demo_text())
@@ -245,13 +245,12 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         self.empty_row.set_visible(not self.app_rows)
 
     def _on_global(self, value: float) -> None:
-        self._preview(value, "Global speed")
+        self._apply_global(value)
         if self.schemas:
             self._later("global", lambda: extension.save_global_factor(self.schemas, value))
 
     def _on_app_speed(self, app_id: str, value: float) -> None:
         self.factors[app_id] = value
-        self._preview(value, self.apps[app_id].get_display_name())
         self._save_factors()
 
     def _on_pick_app(self, _list: Gtk.ListBox, row: Gtk.ListBoxRow) -> None:
@@ -270,14 +269,13 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         self._refresh_app_list()
         self._update_empty_row()
         self._save_factors()
-        self._preview(self.global_control.value, "Global speed")
 
     def _save_factors(self) -> None:
         factors = dict(self.factors)
         self._later("factors", lambda: extension.save_app_factors(self.schemas, factors))
 
-    def _preview(self, value: float, source: str) -> None:
-        self._preview_text = f"Demo speed: {source}, {value:.2f}"
+    def _apply_global(self, value: float) -> None:
+        self._demo_speed = f"Global speed {value:.2f}"
         self._update_demo_status()
         self._later("wsf", lambda: wsf.write(wsf.Factors(value, value)))
 
@@ -300,7 +298,7 @@ class ScrollGaugeWindow(Adw.ApplicationWindow):
         return GLib.SOURCE_REMOVE
 
     def _update_demo_status(self) -> None:
-        self.demo_status.set_label(f"{self._last_swipe}  ·  {self._preview_text}")
+        self.demo_status.set_label(f"{self._last_swipe}  ·  {self._demo_speed}")
 
     def _later(self, key: str, action: Callable[[], None]) -> None:
         if key in self._pending:
